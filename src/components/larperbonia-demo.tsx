@@ -333,6 +333,24 @@ export function LarperboniaDemo() {
           </div>
         </div>
       )}
+
+      {roundComplete && !showPia && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-[#5e4372]/35 p-6 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[3rem] border-8 border-white bg-[#fff2b8] px-8 py-12 text-center shadow-[0_0_80px_25px_rgba(255,231,123,0.75)]">
+            <p className="text-5xl">🏆</p>
+            <p className="mt-4 text-sm font-black uppercase tracking-[0.3em] text-[#c38162]">Word Bridge complete</p>
+            <h2 className="mt-3 font-[family-name:var(--font-fredoka)] text-5xl font-black leading-none text-[#a84d8d] sm:text-6xl">
+              Congratulations,<br />Winner!
+            </h2>
+            <p className="mt-5 font-semibold text-[#886b7d]">
+              You placed all {PLANK_COUNT} bridge planks by finishing the 50-word sprint.
+            </p>
+            <button onClick={resetRound} className="mt-7 rounded-2xl bg-[#b48ed0] px-6 py-3 font-black text-white shadow-[0_5px_0_#8f6eaa] transition hover:-translate-y-0.5 active:translate-y-1 active:shadow-none">
+              Play another sprint ✦
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
