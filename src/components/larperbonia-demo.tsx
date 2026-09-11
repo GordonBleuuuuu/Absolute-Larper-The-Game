@@ -2,7 +2,7 @@
 
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
-const WORDS = [
+const FALLBACK_WORDS = [
   "moss",
   "lantern",
   "firefly",
@@ -18,20 +18,43 @@ const WORDS = [
 const GOAL = 50;
 const COMBO_TRIGGER = 5;
 const PLANK_COUNT = 10;
+const SPRINT_LENGTH = 50;
+
+// Fetch this once when the game mounts.
+async function loadWordBank() {
+  const response = await fetch("/words.json");
+
+  if (!response.ok) {
+    throw new Error("Could not load the meadow word bank.");
+  }
+
+  const allWords: string[] = await response.json();
+  return allWords.filter((word) => /^[a-z]+$/i.test(word));
+}
+
+// Function to grab a random subset of 50 words for a typing sprint.
+function getRandomWords(wordBank: string[], count: number = SPRINT_LENGTH) {
+  const shuffled = [...wordBank].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+}
 
 export function LarperboniaDemo() {
   const [wordIndex, setWordIndex] = useState(0);
   const [typed, setTyped] = useState("");
-  const [teamCoins, setTeamCoins] = useState(16);
+  const [teamCoins, setTeamCoins] = useState(0);
   const [combo, setCombo] = useState(0);
   const [wordsCompleted, setWordsCompleted] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [boosted, setBoosted] = useState(false);
   const [showPia, setShowPia] = useState(false);
-  const [message, setMessage] = useState("Type the glowing meadow word to gather mooncoins.");
+  const [message, setMessage] = useState("Gathering a fresh set of meadow words...");
+  const [wordBank, setWordBank] = useState<string[]>([]);
+  const [sprintWords, setSprintWords] = useState<string[]>([]);
+  const [isLoadingWords, setIsLoadingWords] = useState(true);
+  const [roundComplete, setRoundComplete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const activeWord = WORDS[wordIndex];
+  const activeWord = sprintWords[wordIndex] ?? "";
   const progress = Math.min(100, Math.round((teamCoins / GOAL) * 100));
   const planksBuilt = Math.min(
     PLANK_COUNT,
@@ -39,8 +62,38 @@ export function LarperboniaDemo() {
   );
 
   useEffect(() => {
-    inputRef.current?.focus();
-  }, [activeWord]);
+    if (activeWord && !roundComplete) inputRef.current?.focus();
+  }, [activeWord, roundComplete]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function startSprint() {
+      try {
+        const loadedWords = await loadWordBank();
+        const usableWords = loadedWords.length >= SPRINT_LENGTH ? loadedWords : FALLBACK_WORDS;
+
+        if (!isCurrent) return;
+
+        setWordBank(usableWords);
+        setSprintWords(getRandomWords(usableWords));
+        setMessage("Type the glowing meadow word to place your first bridge plank.");
+      } catch {
+        if (!isCurrent) return;
+
+        setWordBank(FALLBACK_WORDS);
+        setSprintWords(FALLBACK_WORDS);
+        setMessage("The meadow word basket is napping, so practice words are ready instead.");
+      } finally {
+        if (isCurrent) setIsLoadingWords(false);
+      }
+    }
+
+    void startSprint();
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!boosted) return;
@@ -57,6 +110,8 @@ export function LarperboniaDemo() {
   }
 
   function handleTyping(event: ChangeEvent<HTMLInputElement>) {
+    if (roundComplete || !activeWord) return;
+
     const nextTyped = event.target.value.toLowerCase().replace(/[^a-z]/g, "");
 
     if (!activeWord.startsWith(nextTyped)) {
@@ -69,15 +124,19 @@ export function LarperboniaDemo() {
 
     if (nextTyped !== activeWord) return;
 
-    const earned = Math.max(2, Math.ceil(activeWord.length / 3));
     const nextCombo = combo + 1;
+    const isFinalWord = wordIndex === sprintWords.length - 1;
 
-    setTeamCoins((coins) => Math.min(GOAL, coins + earned));
+    setTeamCoins((coins) => Math.min(GOAL, coins + 1));
     setCombo(nextCombo);
     setWordsCompleted((count) => count + 1);
-    setMessage(`Perfect! ${earned} mooncoins floated into the bridge basket.`);
+    setMessage(isFinalWord ? "The final plank landed — the Word Bridge is complete!" : "Perfect! One mooncoin floated into the bridge basket.");
     setTyped("");
-    setWordIndex((index) => (index + 1) % WORDS.length);
+    if (isFinalWord) {
+      setRoundComplete(true);
+    } else {
+      setWordIndex((index) => index + 1);
+    }
     celebrateCombo(nextCombo);
   }
 
@@ -88,14 +147,18 @@ export function LarperboniaDemo() {
   }
 
   function resetRound() {
+    const usableWords = wordBank.length >= SPRINT_LENGTH ? wordBank : FALLBACK_WORDS;
+
     setWordIndex(0);
     setTyped("");
-    setTeamCoins(16);
+    setTeamCoins(0);
     setCombo(0);
     setWordsCompleted(0);
     setMistakes(0);
     setShowPia(false);
-    setMessage("Fresh meadow, fresh bridge. Type the glowing word to begin!");
+    setRoundComplete(false);
+    setSprintWords(getRandomWords(usableWords));
+    setMessage("Fresh meadow, fresh word sprint. Type the glowing word to begin!");
     inputRef.current?.focus();
   }
 
@@ -124,7 +187,7 @@ export function LarperboniaDemo() {
           </div>
 
           <div className="rounded-full border border-white bg-white/75 px-4 py-2 text-sm font-bold shadow-sm">
-            <span className="mr-2 text-[#f0a8ba]">●</span> Word Bridge practice
+            <span className="mr-2 text-[#f0a8ba]">●</span> 50-word bridge sprint
           </div>
         </header>
 
@@ -187,9 +250,11 @@ export function LarperboniaDemo() {
             </div>
 
             <div className="absolute bottom-8 left-1/2 w-[min(92%,560px)] -translate-x-1/2 rounded-3xl border border-white/80 bg-white/90 px-5 py-4 text-center shadow-lg backdrop-blur">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#a57a9f]">Type this meadow word</p>
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#a57a9f]">
+                {isLoadingWords ? "Preparing the word basket" : `Word ${Math.min(wordIndex + 1, SPRINT_LENGTH)} of ${SPRINT_LENGTH}`}
+              </p>
               <div className="mt-2 flex justify-center gap-1 text-3xl font-black tracking-[0.12em] text-[#6e5880] sm:text-4xl">
-                {activeWord.split("").map((letter, index) => (
+                {(activeWord || "...").split("").map((letter, index) => (
                   <span key={`${letter}-${index}`} className={index < typed.length ? "text-[#ef9aad]" : ""}>
                     {letter}
                   </span>
@@ -201,11 +266,12 @@ export function LarperboniaDemo() {
                 id="word-input"
                 value={typed}
                 onChange={handleTyping}
+                disabled={isLoadingWords || roundComplete}
                 autoComplete="off"
                 autoCapitalize="none"
                 spellCheck="false"
                 className="mt-4 w-full rounded-2xl border-2 border-[#dfc3e5] bg-[#fffafc] px-4 py-3 text-center text-lg font-black tracking-[0.12em] text-[#6b557c] outline-none transition focus:border-[#b993ce] focus:ring-4 focus:ring-[#e8cfee]/70"
-                placeholder="type here..."
+                placeholder={roundComplete ? "bridge complete!" : "type here..."}
               />
             </div>
           </section>
@@ -222,7 +288,7 @@ export function LarperboniaDemo() {
                 <div className="h-full rounded-full bg-linear-to-r from-[#f6b4c2] via-[#e6a7d3] to-[#a79ddd] transition-all duration-500" style={{ width: `${progress}%` }} />
               </div>
               <p className="mt-3 text-xs font-semibold leading-5 text-[#9c879a]">
-                Every correctly typed word sends mooncoins to the basket.
+                Each of the 50 correctly typed words builds one mooncoin toward the bridge.
               </p>
             </section>
 
@@ -239,6 +305,7 @@ export function LarperboniaDemo() {
                 </div>
               </div>
               <p className="mt-3 text-center text-xs font-semibold text-[#7295ae]">Little bumps: {mistakes}</p>
+              <p className="mt-1 text-center text-xs font-semibold text-[#7295ae]">{wordsCompleted}/{SPRINT_LENGTH} in this sprint</p>
             </section>
 
             <section className="rounded-[2rem] border-4 border-white bg-[#f3e5fb] p-5 shadow-[0_15px_35px_rgba(108,86,122,0.12)]">
