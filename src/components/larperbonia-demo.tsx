@@ -1,6 +1,7 @@
 "use client";
 
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import { PlayerAuth } from "@/components/player-auth";
 
 const FALLBACK_WORDS = [
   "moss",
@@ -186,8 +187,11 @@ export function LarperboniaDemo() {
             </div>
           </div>
 
-          <div className="rounded-full border border-white bg-white/75 px-4 py-2 text-sm font-bold shadow-sm">
-            <span className="mr-2 text-[#f0a8ba]">●</span> 50-word bridge sprint
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="rounded-full border border-white bg-white/75 px-4 py-2 text-sm font-bold shadow-sm">
+              <span className="mr-2 text-[#f0a8ba]">●</span> 50-word bridge sprint
+            </div>
+            <PlayerAuth />
           </div>
         </header>
 
