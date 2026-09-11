@@ -17,6 +17,7 @@ const WORDS = [
 
 const GOAL = 50;
 const COMBO_TRIGGER = 5;
+const PLANK_COUNT = 10;
 
 export function LarperboniaDemo() {
   const [wordIndex, setWordIndex] = useState(0);
@@ -32,6 +33,10 @@ export function LarperboniaDemo() {
 
   const activeWord = WORDS[wordIndex];
   const progress = Math.min(100, Math.round((teamCoins / GOAL) * 100));
+  const planksBuilt = Math.min(
+    PLANK_COUNT,
+    Math.floor((teamCoins / GOAL) * PLANK_COUNT),
+  );
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -136,14 +141,36 @@ export function LarperboniaDemo() {
             <div className="absolute right-[10%] bottom-[16%] h-36 w-36 rounded-full bg-[#609977] shadow-[inset_-12px_-10px_0_#4b8065]" />
             <div className="absolute right-[17%] bottom-[31%] h-20 w-20 rounded-full bg-[#76ae88]" />
 
-            <div className="absolute left-1/2 top-[42%] h-28 w-[72%] -translate-x-1/2 rounded-[50%] border-y-8 border-[#a06b59] bg-[#e8bd8f] shadow-[0_12px_0_rgba(90,67,71,0.12)]" />
-            <div className="absolute left-1/2 top-[51%] h-5 w-[71%] -translate-x-1/2 rounded-full bg-[#cc9477]" />
+            <div
+              aria-label={`${planksBuilt} of ${PLANK_COUNT} bridge planks built`}
+              className="absolute left-1/2 top-[43%] h-32 w-[76%] -translate-x-1/2"
+              role="img"
+            >
+              <div className="absolute left-0 right-0 top-5 h-2 rounded-full bg-[#9b6959]" />
+              <div className="absolute left-0 right-0 bottom-6 h-2 rounded-full bg-[#9b6959]" />
+              <div className="relative flex h-full items-center gap-1.5 px-1 pt-2">
+                {Array.from({ length: PLANK_COUNT }, (_, index) => {
+                  const isBuilt = index < planksBuilt;
+
+                  return (
+                    <div
+                      className={`h-16 flex-1 rounded-xl border-4 transition-all duration-500 ${
+                        isBuilt
+                          ? "scale-100 border-[#9e674f] bg-[#e9bd88] shadow-[0_7px_0_#b77d63]"
+                          : "scale-75 border-dashed border-[#8fbea2]/70 bg-white/25 opacity-45"
+                      }`}
+                      key={index}
+                    />
+                  );
+                })}
+              </div>
+            </div>
 
             <div className="absolute left-[17%] top-[47%] grid h-20 w-20 place-items-center rounded-[2rem] border-4 border-[#f7d88d] bg-[#ffca64] text-4xl shadow-[0_8px_0_#d69e45]">
               🧺
             </div>
             <p className="absolute left-[10%] top-[65%] rounded-full bg-white/85 px-3 py-1 text-xs font-black text-[#8a6a79] shadow-sm">
-              Bridge basket
+              Bridge basket · {planksBuilt}/{PLANK_COUNT} planks
             </p>
 
             <div className={`absolute left-1/2 top-[48%] -translate-x-1/2 -translate-y-1/2 transition-transform ${boosted ? "scale-125 -translate-y-12" : ""}`}>
