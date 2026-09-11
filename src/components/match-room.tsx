@@ -40,6 +40,10 @@ export function MatchRoom({ roomId }: { roomId: string }) {
   const [isJoining, setIsJoining] = useState(false);
   const [typed, setTyped] = useState("");
   const [clock, setClock] = useState(0);
+  const [soundOn, setSoundOn] = useState(true);
+  const [motionOn, setMotionOn] = useState(true);
+  const [showPia, setShowPia] = useState(false);
+  const [secretCount, setSecretCount] = useState(0);
 
   const loadRoom = useCallback(async () => {
     const [{ data: matchData, error: matchError }, { data: playerData, error: playerError }] = await Promise.all([
@@ -56,6 +60,8 @@ export function MatchRoom({ roomId }: { roomId: string }) {
     setPlayers((playerData ?? []) as MatchPlayer[]);
     setNotice("");
   }, [roomId, supabase]);
+
+  const myPlayer = players.find((player) => player.user_id === userId);
 
   useEffect(() => {
     let active = true;
@@ -82,6 +88,28 @@ export function MatchRoom({ roomId }: { roomId: string }) {
       void supabase.removeChannel(channel);
     };
   }, [loadRoom, roomId, supabase]);
+
+  useEffect(() => {
+    if (!myPlayer) return;
+
+    let active = true;
+    void supabase.from("match_secrets").select("hidden_combo_count").eq("player_id", myPlayer.id).single().then(({ data }) => {
+      if (active) setSecretCount(data?.hidden_combo_count ?? 0);
+    });
+    const channel = supabase.channel(`secret:${myPlayer.id}`).on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "match_secrets", filter: `player_id=eq.${myPlayer.id}` },
+      ({ new: next }) => {
+        const count = Number((next as { hidden_combo_count?: number }).hidden_combo_count ?? 0);
+        if (count >= 5 && secretCount < 5) {
+          setShowPia(true);
+          window.setTimeout(() => setShowPia(false), 2000);
+        }
+        setSecretCount(count);
+      },
+    ).subscribe();
+    return () => { active = false; void supabase.removeChannel(channel); };
+  }, [myPlayer, secretCount, supabase]);
 
   useEffect(() => {
     const initialTick = window.setTimeout(() => setClock(Date.now()), 0);
@@ -139,6 +167,22 @@ export function MatchRoom({ roomId }: { roomId: string }) {
     setTyped("");
     const { error } = await supabase.rpc("submit_typed_word", { p_match_id: roomId, p_word_index: wordIndex, p_word: expected });
     if (error) setNotice(error.message);
+    else playTone(660);
+  }
+
+  function playTone(frequency: number) {
+    if (!soundOn) return;
+    const Audio = window.AudioContext;
+    if (!Audio) return;
+    const context = new Audio();
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.05, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.12);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.12);
   }
 
   async function useFocusBloom() {
@@ -151,7 +195,6 @@ export function MatchRoom({ roomId }: { roomId: string }) {
     setNotice("Invite link copied — send it to your typing pals.");
   }
 
-  const myPlayer = players.find((player) => player.user_id === userId);
   const isHost = match?.host_user_id === userId;
   const readyPlayers = players.filter((player) => player.ready).length;
   const secondsToStart = match?.round_starts_at ? Math.max(0, Math.ceil((new Date(match.round_starts_at).getTime() - clock) / 1000)) : 0;
@@ -188,7 +231,11 @@ export function MatchRoom({ roomId }: { roomId: string }) {
             <h1 className="mt-2 font-[family-name:var(--font-fredoka)] text-4xl font-black">Word Bridge Room</h1>
             <p className="mt-2 text-sm font-bold text-[#9a7181]">Invite code: <span className="rounded-lg bg-[#fff1c4] px-2 py-1 text-[#926d43]">{match.room_code}</span></p>
           </div>
-          <button onClick={copyInvite} className="rounded-2xl bg-[#f4d18a] px-4 py-3 text-sm font-black text-[#805e4c] shadow-[0_5px_0_#d9ae65]">Copy invite link</button>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setSoundOn((enabled) => !enabled)} className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-[#806896]">{soundOn ? "Sound on" : "Sound off"}</button>
+            <button onClick={() => setMotionOn((enabled) => !enabled)} className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-[#806896]">{motionOn ? "Motion on" : "Motion off"}</button>
+            <button onClick={copyInvite} className="rounded-2xl bg-[#f4d18a] px-4 py-3 text-sm font-black text-[#805e4c] shadow-[0_5px_0_#d9ae65]">Copy invite link</button>
+          </div>
         </div>
 
         <div className="mt-7 rounded-3xl bg-[#e7f4ec] p-5">
@@ -232,11 +279,22 @@ export function MatchRoom({ roomId }: { roomId: string }) {
           <section className="mt-6 rounded-[2rem] bg-[#fff1bb] p-7 text-center">
             <p className="text-5xl">🏆</p><h2 className="mt-3 font-[family-name:var(--font-fredoka)] text-4xl font-black text-[#a84d8d]">Congratulations, Winner!</h2>
             <p className="mt-3 font-semibold text-[#856a78]">{winner?.display_name ?? "A meadow pal"} placed the final mooncoin.</p>
+            <div className="mt-6 grid gap-2 text-left sm:grid-cols-2">
+              {players.map((player) => {
+                const accuracy = Math.round((player.words_completed / Math.max(1, player.words_completed + player.strike_count)) * 100);
+                return <div key={player.id} className="rounded-2xl bg-white/70 p-3 text-sm font-bold text-[#7b6374]"><p>{player.display_name}</p><p className="mt-1 text-xs">{player.words_completed} words · {accuracy}% accuracy · {player.strike_count} strikes</p></div>;
+              })}
+            </div>
           </section>
         )}
 
         {notice && <p className="mt-5 rounded-2xl bg-[#fff4d9] p-3 text-sm font-semibold text-[#8a6653]">{notice}</p>}
       </section>
+
+      {match.status === "playing" && secondsRemaining === 0 && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-[#4b3048]/65 p-6 backdrop-blur-sm"><div className="max-w-lg rounded-[3rem] border-8 border-white bg-[#f2a4bb] p-10 text-center"><p className="text-5xl">⌛</p><h2 className="mt-4 font-[family-name:var(--font-fredoka)] text-4xl font-black text-[#642544]">Time&apos;s up!</h2><p className="mt-3 font-semibold text-[#783e58]">The bridge was not finished before the moon set.</p></div></div>
+      )}
+      {showPia && <div className="fixed inset-0 z-50 grid place-items-center bg-[#b152a4]/45 p-6 backdrop-blur-sm"><div className={`${motionOn ? "animate-pulse" : ""} rounded-[3rem] border-8 border-white bg-[#ffe77b] px-10 py-12 text-center shadow-2xl`}><p className="text-sm font-black uppercase tracking-[0.3em] text-[#d67fae]">Private interruption</p><p className="mt-3 font-[family-name:var(--font-fredoka)] text-5xl font-black text-[#bc4f98]">Absolute Pia</p></div></div>}
     </main>
   );
 }
