@@ -1,15 +1,41 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 
-const GOAL = 30;
+const WORDS = [
+  "moss",
+  "lantern",
+  "firefly",
+  "moonbeam",
+  "teacup",
+  "petal",
+  "cozy",
+  "starlight",
+  "meadow",
+  "cloudberry",
+];
+
+const GOAL = 50;
+const COMBO_TRIGGER = 5;
 
 export function LarperboniaDemo() {
-  const [carriedCoins, setCarriedCoins] = useState(4);
+  const [wordIndex, setWordIndex] = useState(0);
+  const [typed, setTyped] = useState("");
   const [teamCoins, setTeamCoins] = useState(16);
+  const [combo, setCombo] = useState(0);
+  const [wordsCompleted, setWordsCompleted] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
   const [boosted, setBoosted] = useState(false);
   const [showPia, setShowPia] = useState(false);
-  const [message, setMessage] = useState("The bridge needs a few more mooncoins.");
+  const [message, setMessage] = useState("Type the glowing meadow word to gather mooncoins.");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const activeWord = WORDS[wordIndex];
+  const progress = Math.min(100, Math.round((teamCoins / GOAL) * 100));
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [activeWord]);
 
   useEffect(() => {
     if (!boosted) return;
@@ -18,35 +44,55 @@ export function LarperboniaDemo() {
     return () => window.clearTimeout(timeout);
   }, [boosted]);
 
-  function gatherCoins() {
-    const found = Math.floor(Math.random() * 3) + 1;
-    setCarriedCoins((coins) => coins + found);
-    setMessage(`You tucked ${found} mooncoin${found === 1 ? "" : "s"} into your pouch.`);
-  }
+  function celebrateCombo(nextCombo: number) {
+    if (nextCombo % COMBO_TRIGGER !== 0) return;
 
-  function depositCoins() {
-    if (carriedCoins === 0) {
-      setMessage("Your little pouch is empty. Go gather by the fireflies!");
-      return;
-    }
-
-    const deposited = Math.min(carriedCoins, 5);
-    setCarriedCoins((coins) => coins - deposited);
-    setTeamCoins((coins) => Math.min(GOAL, coins + deposited));
-    setMessage(`${deposited} mooncoins reached the bridge basket. Cozy teamwork!`);
-  }
-
-  function trySpeedBloom() {
-    setBoosted(true);
-    setMessage("A gentle speed bloom is making your slippers sparkle.");
-  }
-
-  function triggerPiaPreview() {
     setShowPia(true);
     window.setTimeout(() => setShowPia(false), 2000);
   }
 
-  const progress = Math.round((teamCoins / GOAL) * 100);
+  function handleTyping(event: ChangeEvent<HTMLInputElement>) {
+    const nextTyped = event.target.value.toLowerCase().replace(/[^a-z]/g, "");
+
+    if (!activeWord.startsWith(nextTyped)) {
+      setMistakes((count) => count + 1);
+      setMessage("A firefly bonked the wrong letter. Try that bit again!");
+      return;
+    }
+
+    setTyped(nextTyped);
+
+    if (nextTyped !== activeWord) return;
+
+    const earned = Math.max(2, Math.ceil(activeWord.length / 3));
+    const nextCombo = combo + 1;
+
+    setTeamCoins((coins) => Math.min(GOAL, coins + earned));
+    setCombo(nextCombo);
+    setWordsCompleted((count) => count + 1);
+    setMessage(`Perfect! ${earned} mooncoins floated into the bridge basket.`);
+    setTyped("");
+    setWordIndex((index) => (index + 1) % WORDS.length);
+    celebrateCombo(nextCombo);
+  }
+
+  function useFocusBloom() {
+    setBoosted(true);
+    setMessage("Focus Bloom active — your next word is sparkling extra brightly.");
+    inputRef.current?.focus();
+  }
+
+  function resetRound() {
+    setWordIndex(0);
+    setTyped("");
+    setTeamCoins(16);
+    setCombo(0);
+    setWordsCompleted(0);
+    setMistakes(0);
+    setShowPia(false);
+    setMessage("Fresh meadow, fresh bridge. Type the glowing word to begin!");
+    inputRef.current?.focus();
+  }
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#fff8ef] px-4 py-7 text-[#54465b] sm:px-8">
@@ -73,7 +119,7 @@ export function LarperboniaDemo() {
           </div>
 
           <div className="rounded-full border border-white bg-white/75 px-4 py-2 text-sm font-bold shadow-sm">
-            <span className="mr-2 text-[#f0a8ba]">●</span> 3 cozy pals online
+            <span className="mr-2 text-[#f0a8ba]">●</span> Word Bridge practice
           </div>
         </header>
 
@@ -104,7 +150,7 @@ export function LarperboniaDemo() {
               <div className="relative grid h-24 w-24 place-items-center rounded-[2.1rem] border-4 border-white bg-[#f6a9b9] text-5xl shadow-[0_10px_0_#c87690]">
                 🐰
                 <span className="absolute -bottom-8 whitespace-nowrap rounded-full bg-white px-3 py-1 text-xs font-black shadow-sm">
-                  You {boosted ? "— speedy!" : "— little larper"}
+                  You {boosted ? "— focused!" : "— little larper"}
                 </span>
               </div>
             </div>
@@ -112,8 +158,28 @@ export function LarperboniaDemo() {
             <div className="absolute right-[20%] top-[48%] grid h-18 w-18 place-items-center rounded-3xl border-4 border-white bg-[#ac9ee1] p-3 text-3xl shadow-[0_8px_0_#7f75b5]">
               🐸
             </div>
-            <div className="absolute bottom-8 left-1/2 w-[min(92%,540px)] -translate-x-1/2 rounded-3xl border border-white/80 bg-white/85 px-5 py-4 text-center text-sm font-bold shadow-lg backdrop-blur">
-              {message}
+
+            <div className="absolute bottom-8 left-1/2 w-[min(92%,560px)] -translate-x-1/2 rounded-3xl border border-white/80 bg-white/90 px-5 py-4 text-center shadow-lg backdrop-blur">
+              <p className="text-xs font-black uppercase tracking-[0.18em] text-[#a57a9f]">Type this meadow word</p>
+              <div className="mt-2 flex justify-center gap-1 text-3xl font-black tracking-[0.12em] text-[#6e5880] sm:text-4xl">
+                {activeWord.split("").map((letter, index) => (
+                  <span key={`${letter}-${index}`} className={index < typed.length ? "text-[#ef9aad]" : ""}>
+                    {letter}
+                  </span>
+                ))}
+              </div>
+              <label className="sr-only" htmlFor="word-input">Type the word {activeWord}</label>
+              <input
+                ref={inputRef}
+                id="word-input"
+                value={typed}
+                onChange={handleTyping}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck="false"
+                className="mt-4 w-full rounded-2xl border-2 border-[#dfc3e5] bg-[#fffafc] px-4 py-3 text-center text-lg font-black tracking-[0.12em] text-[#6b557c] outline-none transition focus:border-[#b993ce] focus:ring-4 focus:ring-[#e8cfee]/70"
+                placeholder="type here..."
+              />
             </div>
           </section>
 
@@ -129,43 +195,44 @@ export function LarperboniaDemo() {
                 <div className="h-full rounded-full bg-linear-to-r from-[#f6b4c2] via-[#e6a7d3] to-[#a79ddd] transition-all duration-500" style={{ width: `${progress}%` }} />
               </div>
               <p className="mt-3 text-xs font-semibold leading-5 text-[#9c879a]">
-                Gather mooncoins and gently drop them into the basket.
+                Every correctly typed word sends mooncoins to the basket.
               </p>
             </section>
 
             <section className="rounded-[2rem] border-4 border-white bg-[#dff2fc] p-5 shadow-[0_15px_35px_rgba(108,86,122,0.12)]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-extrabold uppercase tracking-[0.15em] text-[#7295ae]">Your pouch</p>
-                  <p className="mt-1 text-3xl font-black text-[#5f7e97]">{carriedCoins} <span className="text-lg">☾</span></p>
+              <p className="text-xs font-extrabold uppercase tracking-[0.15em] text-[#7295ae]">Typing garden</p>
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-white/75 p-3 text-center">
+                  <p className="text-2xl font-black text-[#5f7e97]">{combo}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#829fb3]">Combo</p>
                 </div>
-                <span className="text-4xl">👜</span>
+                <div className="rounded-2xl bg-white/75 p-3 text-center">
+                  <p className="text-2xl font-black text-[#5f7e97]">{wordsCompleted}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-[#829fb3]">Words</p>
+                </div>
               </div>
-              <button onClick={gatherCoins} className="mt-4 w-full rounded-2xl bg-[#91b9d8] px-4 py-3 font-black text-white shadow-[0_5px_0_#6d95b6] transition hover:-translate-y-0.5 hover:bg-[#7eabc9] active:translate-y-1 active:shadow-none">
-                Gather mooncoins
-              </button>
-              <button onClick={depositCoins} className="mt-3 w-full rounded-2xl bg-[#f3b36e] px-4 py-3 font-black text-white shadow-[0_5px_0_#cb8e52] transition hover:-translate-y-0.5 hover:bg-[#e9a661] active:translate-y-1 active:shadow-none">
-                Deposit up to 5
-              </button>
+              <p className="mt-3 text-center text-xs font-semibold text-[#7295ae]">Little bumps: {mistakes}</p>
             </section>
 
             <section className="rounded-[2rem] border-4 border-white bg-[#f3e5fb] p-5 shadow-[0_15px_35px_rgba(108,86,122,0.12)]">
               <p className="text-sm font-black text-[#806896]">Kindness kit</p>
-              <button onClick={trySpeedBloom} className="mt-3 w-full rounded-2xl bg-[#b59bd4] px-4 py-3 font-black text-white shadow-[0_5px_0_#9079ae] transition hover:-translate-y-0.5 hover:bg-[#a98bc9] active:translate-y-1 active:shadow-none">
-                Send speed bloom ✿
+              <button onClick={useFocusBloom} className="mt-3 w-full rounded-2xl bg-[#b59bd4] px-4 py-3 font-black text-white shadow-[0_5px_0_#9079ae] transition hover:-translate-y-0.5 hover:bg-[#a98bc9] active:translate-y-1 active:shadow-none">
+                Focus bloom ✿
               </button>
-              <button onClick={triggerPiaPreview} className="mt-3 w-full rounded-2xl border-2 border-dashed border-[#c7a8d2] bg-white/60 px-4 py-2 text-xs font-bold text-[#9776a4] transition hover:bg-white">
-                Test celebration overlay
+              <button onClick={resetRound} className="mt-3 w-full rounded-2xl border-2 border-dashed border-[#c7a8d2] bg-white/60 px-4 py-2 text-xs font-bold text-[#9776a4] transition hover:bg-white">
+                Restart practice round
               </button>
             </section>
           </aside>
         </div>
+
+        <p className="mx-auto mt-5 max-w-2xl text-center text-sm font-semibold text-[#947c93]">{message}</p>
       </section>
 
       {showPia && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-[#b152a4]/45 p-6 backdrop-blur-sm">
           <div className="animate-pulse rounded-[3rem] border-8 border-white bg-[#ffe77b] px-10 py-12 text-center shadow-[0_0_80px_25px_rgba(255,244,167,0.9)]">
-            <p className="text-sm font-black uppercase tracking-[0.35em] text-[#d67fae]">Meadow mastery</p>
+            <p className="text-sm font-black uppercase tracking-[0.35em] text-[#d67fae]">Five-word streak</p>
             <p className="mt-3 font-[family-name:var(--font-fredoka)] text-5xl font-black leading-none text-[#bc4f98] sm:text-7xl">
               Absolute Pia
             </p>
