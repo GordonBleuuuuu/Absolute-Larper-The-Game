@@ -69,17 +69,18 @@ export function MultiplayerLobby() {
     event.preventDefault();
     if (!validateName()) return;
 
-    const cleanRoomId = roomId.trim();
-    if (!/^[0-9a-f-]{36}$/i.test(cleanRoomId)) {
-      setNotice("Paste the room link or its full room ID.");
+    const roomReference = roomId.trim();
+    const isUuid = /^[0-9a-f-]{36}$/i.test(roomReference);
+    const isShortCode = /^[a-z0-9]{6}$/i.test(roomReference);
+    if (!isUuid && !isShortCode) {
+      setNotice("Paste a six-character invite code or full room ID.");
       return;
     }
 
     setIsWorking(true);
-    const { error } = await supabase.rpc("join_typing_room", {
-      p_match_id: cleanRoomId,
-      p_display_name: displayName.trim(),
-    });
+    const { data, error } = isUuid
+      ? await supabase.rpc("join_typing_room", { p_match_id: roomReference, p_display_name: displayName.trim() })
+      : await supabase.rpc("join_typing_room_by_code", { p_room_code: roomReference, p_display_name: displayName.trim() });
     setIsWorking(false);
 
     if (error) {
@@ -87,7 +88,8 @@ export function MultiplayerLobby() {
       return;
     }
 
-    router.push(`/room/${cleanRoomId}`);
+    const response = data as RoomResponse | null;
+    router.push(`/room/${response?.match_id ?? roomReference}`);
   }
 
   return (
@@ -114,12 +116,12 @@ export function MultiplayerLobby() {
       <div className="my-4 border-t border-dashed border-[#e7c8af]" />
 
       <form onSubmit={joinRoom}>
-        <label className="block text-xs font-black uppercase tracking-[0.12em] text-[#a47a69]" htmlFor="room-id">Join with room ID</label>
+        <label className="block text-xs font-black uppercase tracking-[0.12em] text-[#a47a69]" htmlFor="room-id">Join with invite code</label>
         <input
           id="room-id"
           value={roomId}
           onChange={(event) => setRoomId(event.target.value)}
-          placeholder="Paste the ID from an invite link"
+          placeholder="e.g. A1B2C3"
           className="mt-2 w-full rounded-2xl border-2 border-[#f1d6bd] bg-white/80 px-3 py-2 text-xs font-bold text-[#765a63] outline-none focus:border-[#d8a987]"
         />
         <button disabled={isWorking} className="mt-3 w-full rounded-2xl border-2 border-[#dca576] bg-white/70 px-4 py-2.5 text-sm font-black text-[#a76e45] transition hover:bg-white disabled:cursor-wait disabled:opacity-70">

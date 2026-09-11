@@ -14,6 +14,7 @@ type Match = {
   word_sequence: string[];
   round_starts_at: string | null;
   winner_player_id: string | null;
+  round_ends_at: string | null;
 };
 
 type MatchPlayer = {
@@ -23,6 +24,10 @@ type MatchPlayer = {
   ready: boolean;
   word_index: number;
   words_completed: number;
+  strike_count: number;
+  bloom_charges: number;
+  bloom_active: boolean;
+  is_eliminated: boolean;
 };
 
 export function MatchRoom({ roomId }: { roomId: string }) {
@@ -38,8 +43,8 @@ export function MatchRoom({ roomId }: { roomId: string }) {
 
   const loadRoom = useCallback(async () => {
     const [{ data: matchData, error: matchError }, { data: playerData, error: playerError }] = await Promise.all([
-      supabase.from("matches").select("id, status, host_user_id, team_score, required_score, room_code, word_sequence, round_starts_at, winner_player_id").eq("id", roomId).single(),
-      supabase.from("match_players").select("id, user_id, display_name, ready, word_index, words_completed").eq("match_id", roomId).order("display_name"),
+      supabase.from("matches").select("id, status, host_user_id, team_score, required_score, room_code, word_sequence, round_starts_at, round_ends_at, winner_player_id").eq("id", roomId).single(),
+      supabase.from("match_players").select("id, user_id, display_name, ready, word_index, words_completed, strike_count, bloom_charges, bloom_active, is_eliminated").eq("match_id", roomId).order("display_name"),
     ]);
 
     if (matchError || playerError) {
@@ -124,9 +129,20 @@ export function MatchRoom({ roomId }: { roomId: string }) {
   async function submitWord() {
     const wordIndex = myPlayer?.word_index ?? 0;
     const expected = match?.word_sequence[wordIndex] ?? "";
-    if (!expected || typed.toLowerCase() !== expected) return;
+    if (!expected || typed.toLowerCase() !== expected) {
+      const { data } = await supabase.rpc("record_typing_mistake", { p_match_id: roomId });
+      const result = data as { protected?: boolean; eliminated?: boolean } | null;
+      setTyped("");
+      setNotice(result?.protected ? "Focus Bloom protected that typo!" : result?.eliminated ? "Three strikes — you are out of this round." : "Strike recorded. Be careful!");
+      return;
+    }
     setTyped("");
     const { error } = await supabase.rpc("submit_typed_word", { p_match_id: roomId, p_word_index: wordIndex, p_word: expected });
+    if (error) setNotice(error.message);
+  }
+
+  async function useFocusBloom() {
+    const { error } = await supabase.rpc("use_focus_bloom", { p_match_id: roomId });
     if (error) setNotice(error.message);
   }
 
@@ -141,6 +157,7 @@ export function MatchRoom({ roomId }: { roomId: string }) {
   const secondsToStart = match?.round_starts_at ? Math.max(0, Math.ceil((new Date(match.round_starts_at).getTime() - clock) / 1000)) : 0;
   const expectedWord = match && myPlayer ? match.word_sequence[myPlayer.word_index] : "";
   const winner = players.find((player) => player.id === match?.winner_player_id);
+  const secondsRemaining = match?.round_ends_at ? Math.max(0, Math.ceil((new Date(match.round_ends_at).getTime() - clock) / 1000)) : 0;
 
   if (!match) {
     return (
@@ -183,7 +200,7 @@ export function MatchRoom({ roomId }: { roomId: string }) {
             {players.map((player) => (
               <div key={player.id} className="flex items-center justify-between rounded-2xl bg-white/80 px-4 py-3 font-bold">
                 <span>{player.display_name}{player.user_id === match.host_user_id ? " ✦ host" : ""}</span>
-                <span className={player.ready ? "text-[#5eaa78]" : "text-[#b49da8]"}>{player.ready ? "ready" : "waiting"}</span>
+                <span className={player.is_eliminated ? "text-[#cf5f78]" : player.ready ? "text-[#5eaa78]" : "text-[#b49da8]"}>{player.is_eliminated ? "out" : player.ready ? "ready" : "waiting"}</span>
               </div>
             ))}
           </div>
@@ -202,10 +219,12 @@ export function MatchRoom({ roomId }: { roomId: string }) {
               <p className="font-[family-name:var(--font-fredoka)] text-6xl font-black text-[#9f67a0]">{secondsToStart}</p>
             ) : (
               <>
-                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#a272a0]">Type your word · team bridge {match.team_score}/50</p>
+                <p className="text-xs font-black uppercase tracking-[0.2em] text-[#a272a0]">Type your word · team bridge {match.team_score}/50 · {secondsRemaining}s left</p>
                 <p className="mt-4 font-[family-name:var(--font-fredoka)] text-5xl font-black tracking-wider text-[#715274]">{expectedWord}</p>
-                <input value={typed} onChange={(event) => setTyped(event.target.value.replace(/[^a-z]/gi, "").toLowerCase())} onKeyDown={(event) => { if (event.key === "Enter") void submitWord(); }} className="mt-5 w-full rounded-2xl border-2 border-[#d5b4de] bg-white px-4 py-3 text-center text-xl font-black tracking-wider outline-none focus:border-[#a677b5]" placeholder="type the word" autoFocus />
+                <input value={typed} disabled={myPlayer?.is_eliminated || secondsRemaining === 0} onChange={(event) => setTyped(event.target.value.replace(/[^a-z]/gi, "").toLowerCase())} onKeyDown={(event) => { if (event.key === "Enter") void submitWord(); }} className="mt-5 w-full rounded-2xl border-2 border-[#d5b4de] bg-white px-4 py-3 text-center text-xl font-black tracking-wider outline-none focus:border-[#a677b5] disabled:opacity-50" placeholder="type the word" autoFocus />
                 <button onClick={submitWord} className="mt-3 rounded-2xl bg-[#b48ed0] px-5 py-3 font-black text-white shadow-[0_5px_0_#8f6eaa]">Place mooncoin</button>
+                <button onClick={useFocusBloom} disabled={!myPlayer?.bloom_charges || myPlayer.bloom_active} className="ml-3 rounded-2xl bg-[#f0b5d5] px-5 py-3 font-black text-[#804860] disabled:opacity-50">Focus Bloom ({myPlayer?.bloom_charges ?? 0})</button>
+                <p className="mt-3 text-xs font-bold text-[#9a7181]">Strikes: {myPlayer?.strike_count ?? 0}/3 {myPlayer?.bloom_active ? "· Bloom shield ready" : ""}</p>
               </>
             )}
           </section>
