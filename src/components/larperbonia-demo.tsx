@@ -48,6 +48,8 @@ export function LarperboniaDemo() {
   const [wordsCompleted, setWordsCompleted] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [boosted, setBoosted] = useState(false);
+  const [bloomShield, setBloomShield] = useState(false);
+  const [bloomCharges, setBloomCharges] = useState(2);
   const [showPia, setShowPia] = useState(false);
   const [message, setMessage] = useState("Gathering a fresh set of meadow words...");
   const [wordBank, setWordBank] = useState<string[]>([]);
@@ -117,6 +119,11 @@ export function LarperboniaDemo() {
     const nextTyped = event.target.value.toLowerCase().replace(/[^a-z]/g, "");
 
     if (!activeWord.startsWith(nextTyped)) {
+      if (bloomShield) {
+        setBloomShield(false);
+        setMessage("Focus Bloom caught that little typo. Your streak is safe!");
+        return;
+      }
       setMistakes((count) => count + 1);
       setMessage("A firefly bonked the wrong letter. Try that bit again!");
       return;
@@ -143,8 +150,20 @@ export function LarperboniaDemo() {
   }
 
   function useFocusBloom() {
+    if (bloomShield) {
+      setMessage("A Focus Bloom is already protecting your next typo.");
+      return;
+    }
+
+    if (bloomCharges === 0) {
+      setMessage("Your Focus Blooms are resting until the next sprint.");
+      return;
+    }
+
+    setBloomCharges((charges) => charges - 1);
+    setBloomShield(true);
     setBoosted(true);
-    setMessage("Focus Bloom active — your next word is sparkling extra brightly.");
+    setMessage("Focus Bloom active — your next typo is protected.");
     inputRef.current?.focus();
   }
 
@@ -158,6 +177,8 @@ export function LarperboniaDemo() {
     setWordsCompleted(0);
     setMistakes(0);
     setShowPia(false);
+    setBloomShield(false);
+    setBloomCharges(2);
     setRoundComplete(false);
     setSprintWords(getRandomWords(usableWords));
     setMessage("Fresh meadow, fresh word sprint. Type the glowing word to begin!");
@@ -328,7 +349,8 @@ export function LarperboniaDemo() {
 
             <section className="rounded-[2rem] border-4 border-white bg-[#f3e5fb] p-5 shadow-[0_15px_35px_rgba(108,86,122,0.12)]">
               <p className="text-sm font-black text-[#806896]">Kindness kit</p>
-              <button onClick={useFocusBloom} className="mt-3 w-full rounded-2xl bg-[#b59bd4] px-4 py-3 font-black text-white shadow-[0_5px_0_#9079ae] transition hover:-translate-y-0.5 hover:bg-[#a98bc9] active:translate-y-1 active:shadow-none">
+              <p className="mt-1 text-xs font-semibold text-[#9a80aa]">{bloomShield ? "Shield ready for one typo" : `${bloomCharges} bloom${bloomCharges === 1 ? "" : "s"} left this sprint`}</p>
+              <button onClick={useFocusBloom} disabled={bloomCharges === 0} className="mt-3 w-full rounded-2xl bg-[#b59bd4] px-4 py-3 font-black text-white shadow-[0_5px_0_#9079ae] transition hover:-translate-y-0.5 hover:bg-[#a98bc9] active:translate-y-1 active:shadow-none disabled:cursor-not-allowed disabled:opacity-55">
                 Focus bloom ✿
               </button>
               <button onClick={resetRound} className="mt-3 w-full rounded-2xl border-2 border-dashed border-[#c7a8d2] bg-white/60 px-4 py-2 text-xs font-bold text-[#9776a4] transition hover:bg-white">
