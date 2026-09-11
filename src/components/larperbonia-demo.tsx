@@ -297,6 +297,19 @@ export function LarperboniaDemo() {
               </p>
             </section>
 
+            <section className="rounded-[2rem] border-4 border-white bg-[#fcecf3] p-5 shadow-[0_15px_35px_rgba(108,86,122,0.12)]">
+              <p className="text-sm font-black text-[#a2637e]">How to play</p>
+              <ol className="mt-3 space-y-2 text-xs font-semibold leading-5 text-[#9a7181]">
+                <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">1</span>Type the glowing word in the box.</li>
+                <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">2</span>Each correct word earns one mooncoin.</li>
+                <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">3</span>Every five mooncoins places a bridge plank.</li>
+                <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">4</span>Finish all 50 words to win the sprint.</li>
+              </ol>
+              <div className="my-4 border-t border-dashed border-[#edc9d7]" />
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[#bd7891]">Play with friends</p>
+              <p className="mt-2 text-xs font-semibold leading-5 text-[#9a7181]">Sign in with email, choose a meadow name, create a room, send its invite link, then ready up together.</p>
+            </section>
+
             <section className="rounded-[2rem] border-4 border-white bg-[#dff2fc] p-5 shadow-[0_15px_35px_rgba(108,86,122,0.12)]">
               <p className="text-xs font-extrabold uppercase tracking-[0.15em] text-[#7295ae]">Typing garden</p>
               <div className="mt-3 grid grid-cols-2 gap-3">
