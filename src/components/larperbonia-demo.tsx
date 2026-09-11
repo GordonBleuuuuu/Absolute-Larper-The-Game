@@ -56,6 +56,7 @@ export function LarperboniaDemo() {
   const [sprintWords, setSprintWords] = useState<string[]>([]);
   const [isLoadingWords, setIsLoadingWords] = useState(true);
   const [roundComplete, setRoundComplete] = useState(false);
+  const [gameOver, setGameOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const activeWord = sprintWords[wordIndex] ?? "";
@@ -114,7 +115,7 @@ export function LarperboniaDemo() {
   }
 
   function handleTyping(event: ChangeEvent<HTMLInputElement>) {
-    if (roundComplete || !activeWord) return;
+    if (roundComplete || gameOver || !activeWord) return;
 
     const nextTyped = event.target.value.toLowerCase().replace(/[^a-z]/g, "");
 
@@ -124,8 +125,14 @@ export function LarperboniaDemo() {
         setMessage("Focus Bloom caught that little typo. Your streak is safe!");
         return;
       }
-      setMistakes((count) => count + 1);
-      setMessage("A firefly bonked the wrong letter. Try that bit again!");
+      const nextMistakes = mistakes + 1;
+      setMistakes(nextMistakes);
+      if (nextMistakes >= 3) {
+        setGameOver(true);
+        setMessage("Three strikes. The meadow has ended this sprint.");
+      } else {
+        setMessage(`Wrong letter — strike ${nextMistakes} of 3. Try that bit again!`);
+      }
       return;
     }
 
@@ -180,6 +187,7 @@ export function LarperboniaDemo() {
     setBloomShield(false);
     setBloomCharges(2);
     setRoundComplete(false);
+    setGameOver(false);
     setSprintWords(getRandomWords(usableWords));
     setMessage("Fresh meadow, fresh word sprint. Type the glowing word to begin!");
     inputRef.current?.focus();
@@ -292,12 +300,12 @@ export function LarperboniaDemo() {
                 id="word-input"
                 value={typed}
                 onChange={handleTyping}
-                disabled={isLoadingWords || roundComplete}
+                disabled={isLoadingWords || roundComplete || gameOver}
                 autoComplete="off"
                 autoCapitalize="none"
                 spellCheck="false"
                 className="mt-4 w-full rounded-2xl border-2 border-[#dfc3e5] bg-[#fffafc] px-4 py-3 text-center text-lg font-black tracking-[0.12em] text-[#6b557c] outline-none transition focus:border-[#b993ce] focus:ring-4 focus:ring-[#e8cfee]/70"
-                placeholder={roundComplete ? "bridge complete!" : "type here..."}
+                placeholder={roundComplete ? "bridge complete!" : gameOver ? "sprint lost" : "type here..."}
               />
             </div>
           </section>
@@ -324,7 +332,7 @@ export function LarperboniaDemo() {
                 <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">1</span>Type the glowing word in the box.</li>
                 <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">2</span>Each correct word earns one mooncoin.</li>
                 <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">3</span>Every five mooncoins places a bridge plank.</li>
-                <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">4</span>Finish all 50 words to win the sprint.</li>
+                <li><span className="mr-2 inline-grid h-5 w-5 place-items-center rounded-full bg-white text-[10px] font-black text-[#c27896]">4</span>Three wrong letters ends the sprint. Finish all 50 words to win.</li>
               </ol>
               <div className="my-4 border-t border-dashed border-[#edc9d7]" />
               <p className="text-xs font-black uppercase tracking-[0.12em] text-[#bd7891]">Play with friends</p>
@@ -343,7 +351,7 @@ export function LarperboniaDemo() {
                   <p className="text-[10px] font-bold uppercase tracking-wider text-[#829fb3]">Words</p>
                 </div>
               </div>
-              <p className="mt-3 text-center text-xs font-semibold text-[#7295ae]">Little bumps: {mistakes}</p>
+              <p className="mt-3 text-center text-xs font-semibold text-[#7295ae]">Strikes: {mistakes}/3</p>
               <p className="mt-1 text-center text-xs font-semibold text-[#7295ae]">{wordsCompleted}/{SPRINT_LENGTH} in this sprint</p>
             </section>
 
@@ -389,6 +397,21 @@ export function LarperboniaDemo() {
             </p>
             <button onClick={resetRound} className="mt-7 rounded-2xl bg-[#b48ed0] px-6 py-3 font-black text-white shadow-[0_5px_0_#8f6eaa] transition hover:-translate-y-0.5 active:translate-y-1 active:shadow-none">
               Play another sprint ✦
+            </button>
+          </div>
+        </div>
+      )}
+
+      {gameOver && !showPia && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-[#4b3048]/65 p-6 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[3rem] border-8 border-white bg-[#f2a4bb] px-8 py-12 text-center shadow-[0_0_80px_25px_rgba(237,121,158,0.7)]">
+            <p className="text-5xl">💀</p>
+            <p className="mt-4 text-sm font-black uppercase tracking-[0.3em] text-[#7a3759]">Three strikes</p>
+            <h2 className="mt-3 font-[family-name:var(--font-fredoka)] text-4xl font-black leading-tight text-[#642544] sm:text-5xl">
+              HAHA LOSER<br />PIECE OF SHIT
+            </h2>
+            <button onClick={resetRound} className="mt-7 rounded-2xl bg-white px-6 py-3 font-black text-[#a34e70] shadow-[0_5px_0_#d77b9a] transition hover:-translate-y-0.5 active:translate-y-1 active:shadow-none">
+              Try again
             </button>
           </div>
         </div>
