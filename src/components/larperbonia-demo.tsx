@@ -2,6 +2,7 @@
 
 import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import { PlayerAuth } from "@/components/player-auth";
+import { MultiplayerLobby } from "@/components/multiplayer-lobby";
 
 const FALLBACK_WORDS = [
   "moss",
@@ -321,6 +322,8 @@ export function LarperboniaDemo() {
                 Restart practice round
               </button>
             </section>
+
+            <MultiplayerLobby />
           </aside>
         </div>
 
